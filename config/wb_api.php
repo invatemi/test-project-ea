@@ -1,0 +1,11 @@
+<?php
+
+return [
+    'host' => env('WB_API_HOST', 'http://109.73.206.144:6969'),
+    'key' => env('WB_API_KEY'),
+    'limit' => (int) env('WB_API_LIMIT', 500),
+    'date_from' => env('WB_API_DATE_FROM', '2020-01-01'),
+    'date_to' => env('WB_API_DATE_TO', '2025-12-31'),
+    'request_delay_ms' => (int) env('WB_API_REQUEST_DELAY_MS', 1100),
+    'max_retries' => (int) env('WB_API_MAX_RETRIES', 15),
+];
