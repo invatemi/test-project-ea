@@ -47,15 +47,13 @@ class CreateAccountToken extends Command
             return self::FAILURE;
         }
 
-        $token = AccountToken::query()->updateOrCreate(
-            [
-                'account_id' => $account->id,
-                'api_service_id' => $service->id,
-                'token_type_id' => $type->id,
-            ],
-            ['is_active' => true],
-        );
+        $token = AccountToken::query()->firstOrNew([
+            'account_id' => $account->id,
+            'api_service_id' => $service->id,
+            'token_type_id' => $type->id,
+        ]);
 
+        $token->is_active = true;
         $token->setCredentialsArray($credentials);
         $token->save();
 
