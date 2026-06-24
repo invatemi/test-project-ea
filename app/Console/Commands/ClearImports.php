@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ClearImports extends Command
 {
@@ -13,13 +14,21 @@ class ClearImports extends Command
 
     public function handle(): int
     {
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        $isMysql = DB::connection()->getDriverName() === 'mysql';
 
-        foreach (['incomes', 'orders', 'sales', 'stocks'] as $table) {
-            DB::table($table)->truncate();
+        if ($isMysql) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
         }
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        foreach (['incomes', 'orders', 'sales', 'stocks'] as $table) {
+            if (Schema::hasTable($table)) {
+                DB::table($table)->truncate();
+            }
+        }
+
+        if ($isMysql) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        }
 
         $this->info('Таблицы incomes, orders, sales, stocks очищены.');
 

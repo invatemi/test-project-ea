@@ -39,8 +39,6 @@ class FreshDataRangeResolverTest extends TestCase
 
     public function test_fresh_range_uses_last_sync_with_buffer(): void
     {
-        $this->artisan('migrate');
-
         $company = Company::query()->create(['name' => 'Test Co']);
         $account = Account::query()->create(['company_id' => $company->id, 'name' => 'acc1', 'is_active' => true]);
 
@@ -61,8 +59,6 @@ class FreshDataRangeResolverTest extends TestCase
 
     public function test_fresh_range_without_sync_uses_buffer_from_today(): void
     {
-        $this->artisan('migrate');
-
         $resolver = app(FreshDataRangeResolver::class);
         $result = $resolver->resolve('incomes', 99, null, null);
 

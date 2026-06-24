@@ -86,4 +86,32 @@ class WbApiClientTest extends TestCase
         $this->assertFalse($response->successful());
         $this->assertSame(403, $response->status());
     }
+
+    public function test_bearer_token_is_sent_as_authorization_header(): void
+    {
+        Http::fake([
+            'test-api.local/api/orders*' => Http::response(['data' => [], 'meta' => ['last_page' => 1]], 200),
+        ]);
+
+        $client = app(WbApiClient::class)->forToken($this->makeToken('bearer', ['token' => 'bearer-xyz']));
+        $client->fetch('orders', '2024-01-01', '2024-01-31', 1);
+
+        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer bearer-xyz'));
+    }
+
+    public function test_exhausts_retries_and_returns_last_error(): void
+    {
+        Http::fake([
+            'test-api.local/api/orders*' => Http::response('Too many requests', 429, ['Retry-After' => '1']),
+        ]);
+
+        config(['wb_api.max_retries' => 2, 'wb_api.request_delay_ms' => 0]);
+
+        $client = app(WbApiClient::class)->forToken($this->makeToken());
+        $response = $client->fetch('orders', '2024-01-01', '2024-01-31', 1);
+
+        $this->assertFalse($response->successful());
+        $this->assertSame(429, $response->status());
+        Http::assertSentCount(2);
+    }
 }
