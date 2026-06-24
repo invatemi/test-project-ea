@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Account;
+use App\Models\AccountSyncState;
+use App\Models\AccountToken;
 use App\Models\Order;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -11,8 +14,49 @@ use Illuminate\Support\Str;
 
 class WbDataImporter
 {
-    public function __construct(private readonly WbApiClient $client)
+    private ?ApiClientInterface $client = null;
+
+    private int $accountId = 0;
+
+    private bool $verbose = false;
+
+    /** @var null|\Closure(string): void */
+    private $debugLogger = null;
+
+    public function __construct(private readonly ApiClientFactory $clientFactory)
     {
+    }
+
+    public function forAccount(Account $account, AccountToken $token): self
+    {
+        $clone = clone $this;
+        $clone->accountId = $account->id;
+        $clone->client = $this->clientFactory->make($token);
+
+        if ($clone->client instanceof WbApiClient) {
+            $clone->client = $clone->client->setVerbose($clone->verbose);
+
+            if ($clone->debugLogger !== null) {
+                $clone->client->setDebugLogger($clone->debugLogger);
+            }
+        }
+
+        return $clone;
+    }
+
+    public function setVerbose(bool $verbose = true): self
+    {
+        $this->verbose = $verbose;
+
+        return $this;
+    }
+
+    /** @param  \Closure(string): void  $logger */
+    public function setDebugLogger(\Closure $logger): self
+    {
+        $this->debugLogger = $logger;
+
+        return $this;
     }
 
     public function import(
@@ -24,6 +68,8 @@ class WbDataImporter
         ?array $uniqueBy = null,
         ?callable $rowTransformer = null,
     ): int {
+        $uniqueBy = $this->prependAccountId($uniqueBy);
+
         return $this->paginate($endpoint, $dateFrom, $dateTo, function (array $rows) use ($model, $fillable, $uniqueBy, $rowTransformer): int {
             $payload = $this->buildPayload($rows, $fillable, $rowTransformer);
 
@@ -55,6 +101,7 @@ class WbDataImporter
                 $record = $this->nullifyPlaceholderIds(
                     Arr::only($this->normalizeRow($row), $fillable)
                 );
+                $record['account_id'] = $this->accountId;
 
                 if ($this->isEmptyRecord($record)) {
                     continue;
@@ -69,8 +116,8 @@ class WbDataImporter
                 }
             }
 
-            $imported = $this->upsertBatch(new Order, $bySrid, ['srid']);
-            $imported += $this->upsertBatch(new Order, $byOdid, ['odid']);
+            $imported = $this->upsertBatch(new Order, $bySrid, ['account_id', 'srid']);
+            $imported += $this->upsertBatch(new Order, $byOdid, ['account_id', 'odid']);
 
             if ($withoutKey !== []) {
                 Order::query()->insert($withoutKey);
@@ -79,6 +126,11 @@ class WbDataImporter
 
             return $imported;
         });
+    }
+
+    public function markSynced(string $entity, string $dateFrom): void
+    {
+        AccountSyncState::markSynced($this->accountId, $entity, $dateFrom);
     }
 
     public static function stockDate(?string $date = null): string
@@ -91,6 +143,10 @@ class WbDataImporter
      */
     private function paginate(string $endpoint, string $dateFrom, ?string $dateTo, callable $processPage): int
     {
+        if ($this->client === null) {
+            throw new \RuntimeException('Importer not configured. Call forAccount() first.');
+        }
+
         DB::connection()->disableQueryLog();
 
         $page = 1;
@@ -115,6 +171,10 @@ class WbDataImporter
 
             $imported += $processPage($rows);
 
+            if ($this->verbose) {
+                $this->logDebug("Страница {$page}/{$lastPage}: +".count($rows)." строк, всего {$imported}");
+            }
+
             if ($lastPage > 0 && $page >= $lastPage) {
                 break;
             }
@@ -136,6 +196,7 @@ class WbDataImporter
         foreach ($rows as $row) {
             $normalized = $this->normalizeRow($row);
             $record = Arr::only($normalized, $fillable);
+            $record['account_id'] = $this->accountId;
 
             if ($rowTransformer !== null) {
                 $record = $rowTransformer($record, $normalized);
@@ -165,7 +226,7 @@ class WbDataImporter
     private function isEmptyRecord(array $record): bool
     {
         return collect($record)
-            ->except(['created_at', 'updated_at'])
+            ->except(['created_at', 'updated_at', 'account_id'])
             ->filter(fn ($value) => $value !== null && $value !== '')
             ->isEmpty();
     }
@@ -201,5 +262,32 @@ class WbDataImporter
         $model->newQuery()->upsert($rows, $uniqueBy, $updateColumns);
 
         return count($rows);
+    }
+
+    /** @param  array<int, string>|null  $uniqueBy */
+    private function prependAccountId(?array $uniqueBy): ?array
+    {
+        if ($uniqueBy === null) {
+            return null;
+        }
+
+        if (! in_array('account_id', $uniqueBy, true)) {
+            array_unshift($uniqueBy, 'account_id');
+        }
+
+        return $uniqueBy;
+    }
+
+    private function logDebug(string $message): void
+    {
+        if ($this->debugLogger !== null) {
+            ($this->debugLogger)($message);
+
+            return;
+        }
+
+        if (defined('STDERR')) {
+            fwrite(STDERR, '[Import] '.$message.PHP_EOL);
+        }
     }
 }

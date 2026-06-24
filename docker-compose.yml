@@ -20,11 +20,11 @@ services:
     networks:
       - wb_net
 
-  app:
+  php:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: wb_api_app
+    container_name: wb_api_php
     restart: unless-stopped
     env_file:
       - .env

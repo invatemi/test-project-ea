@@ -11,4 +11,7 @@ if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "" ]; then
     php artisan key:generate --force
 fi
 
+echo "* * * * * cd /var/www/html && php artisan schedule:run >> /var/www/html/storage/logs/scheduler-cron.log 2>&1" | crontab -
+cron
+
 exec "$@"

@@ -2,15 +2,17 @@
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\ResolvesImportDateRange;
+use App\Console\Commands\Concerns\RunsAccountImport;
 use App\Services\WbDataImporter;
 use Illuminate\Console\Command;
 
 class ImportOrders extends Command
 {
-    use ResolvesImportDateRange;
+    use RunsAccountImport;
 
     protected $signature = 'app:import-orders
+                            {--account= : ID или имя аккаунта}
+                            {--all-accounts : Импорт для всех активных аккаунтов}
                             {--date-from= : Дата начала (Y-m-d)}
                             {--date-to= : Дата окончания (Y-m-d)}';
 
@@ -18,14 +20,24 @@ class ImportOrders extends Command
 
     public function handle(WbDataImporter $importer): int
     {
-        $dateFrom = $this->resolveDateFrom();
-        $dateTo = $this->resolveDateTo();
+        $importer = $this->configureImporter();
+        $total = 0;
 
-        $this->info("Импорт orders: {$dateFrom} — {$dateTo}");
+        foreach ($this->resolveAccounts() as $account) {
+            $range = $this->resolveFreshRange('orders', $account);
+            $dateFrom = $range['date_from'];
+            $dateTo = $range['date_to'];
 
-        $count = $importer->importOrders($dateFrom, $dateTo);
+            $this->info("Импорт orders [{$account->name}]: {$dateFrom} — {$dateTo}");
 
-        $this->info("Готово: {$count} записей.");
+            $count = $this->importerForAccount($importer, $account)->importOrders($dateFrom, $dateTo);
+
+            $this->importerForAccount($importer, $account)->markSynced('orders', $dateFrom);
+            $this->info("Готово [{$account->name}]: {$count} записей.");
+            $total += $count;
+        }
+
+        $this->info("Итого orders: {$total} записей.");
 
         return self::SUCCESS;
     }
