@@ -32,5 +32,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="WB_API_HOST" value="http://test-api.local"/>
+        <env name="WB_API_KEY" value="test-key"/>
+        <env name="WB_API_REQUEST_DELAY_MS" value="0"/>
+        <env name="WB_API_MAX_RETRIES" value="3"/>
     </php>
 </phpunit>

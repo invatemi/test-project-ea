@@ -295,11 +295,10 @@ CREATE TABLE `stocks` (
     CONSTRAINT `fk_stocks_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------------
--- Начальные данные: WB Test API
+-- Начальные справочники (base_url задаётся через WbApiSeeder / WB_API_HOST в .env)
 -- ---------------------------------------------------------------------------
 INSERT INTO `api_services` (`slug`, `name`, `base_url`) VALUES
-    ('wb_test', 'WB Test API', 'http://109.73.206.144:6969');
+    ('wb_test', 'WB Test API', '');
 
 INSERT INTO `token_types` (`slug`, `name`) VALUES
     ('api_key', 'API Key (query parameter)'),

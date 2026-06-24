@@ -84,9 +84,9 @@ return new class extends Migration
 
         if (DB::table('api_services')->where('slug', 'wb_test')->doesntExist()) {
             DB::table('api_services')->insert([
-                'slug' => 'wb_test',
+                'slug' => config('wb_api.default_service', 'wb_test'),
                 'name' => 'WB Test API',
-                'base_url' => 'http://109.73.206.144:6969',
+                'base_url' => config('wb_api.host', ''),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

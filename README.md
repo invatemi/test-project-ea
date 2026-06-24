@@ -31,7 +31,10 @@ Laravel CLI-приложение для импорта данных из [тес
 
 2. Заполнить в `.env`:
    - `DB_PASSWORD` и `MYSQL_ROOT_PASSWORD` — один пароль MySQL
-   - `WB_API_KEY` — ключ тестового API (временно, до создания токена в БД)
+   - `WB_API_HOST` — URL тестового API
+   - `WB_API_KEY` — ключ тестового API (или создайте токен в БД через artisan)
+   - `MYSQL_PORT` — порт MySQL на хосте (по умолчанию **3307**)
+   - `MYSQL_BIND_HOST` — интерфейс публикации (по умолчанию **127.0.0.1**)
 
 3. Запустить:
    ```bash
@@ -43,7 +46,21 @@ Laravel CLI-приложение для импорта данных из [тес
    docker compose ps
    ```
 
-MySQL доступен на хосте: `127.0.0.1:3307`, база `wb_api_test`.
+MySQL доступен на хосте: `${MYSQL_BIND_HOST}:${MYSQL_PORT}` (по умолчанию `127.0.0.1:3307`), база `wb_api_test`.
+
+При первом запуске контейнера `WbApiSeeder` подставит `WB_API_HOST` в таблицу `api_services`.
+
+---
+
+## Тесты
+
+```bash
+docker compose exec php php artisan test
+```
+
+Покрытие: шифрование токенов, rate limit, мультиаккаунт, fresh data, artisan-команды создания токена.
+
+Отчёт по этапам: [REPORT.md](REPORT.md)
 
 ---
 
@@ -63,7 +80,7 @@ docker compose exec php php artisan app:account:create 2 "WB-основной"
 
 ### 3. Создать API-сервис (если нужен новый)
 ```bash
-docker compose exec php php artisan app:api-service:create wb_test http://109.73.206.144:6969 "WB Test API"
+docker compose exec php php artisan app:api-service:create wb_test "${WB_API_HOST}" "WB Test API"
 ```
 
 ### 4. Создать тип токена (если нужен новый)

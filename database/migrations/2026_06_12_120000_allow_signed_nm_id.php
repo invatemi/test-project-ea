@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('incomes')) {
+            return;
+        }
+
         DB::statement('ALTER TABLE incomes MODIFY nm_id BIGINT NULL');
         DB::statement('ALTER TABLE orders MODIFY nm_id BIGINT NULL');
         DB::statement('ALTER TABLE sales MODIFY nm_id BIGINT NULL');
@@ -15,6 +19,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('incomes')) {
+            return;
+        }
         DB::statement('ALTER TABLE incomes MODIFY nm_id BIGINT UNSIGNED NULL');
         DB::statement('ALTER TABLE orders MODIFY nm_id BIGINT UNSIGNED NULL');
         DB::statement('ALTER TABLE sales MODIFY nm_id BIGINT UNSIGNED NULL');
