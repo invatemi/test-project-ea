@@ -181,10 +181,12 @@ docker compose down
 docker compose down -v   # удалить данные БД
 ```
 
-Миграции (для существующей БД без пересоздания volume):
+Миграции (для существующей БД без пересоздания volume; при старте контейнера выполняются автоматически):
 ```bash
 docker compose exec php php artisan migrate
 ```
+
+Схема импорта (`incomes`, `orders`, `sales`, `stocks`) создаётся через миграции Laravel и дублируется в `db.sql` для первичной инициализации MySQL volume.
 
 ---
 
