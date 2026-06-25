@@ -3,43 +3,52 @@
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\RunsAccountImport;
+use App\Services\ImportRunner;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Artisan;
 
 class ImportAll extends Command
 {
     use RunsAccountImport;
 
+    /** @var array<int, string> */
+    private const ENTITIES = ['incomes', 'orders', 'sales', 'stocks'];
+
     protected $signature = 'app:import-all
                             {--account= : ID или имя аккаунта}
                             {--all-accounts : Импорт для всех активных аккаунтов}
                             {--date-from= : Дата начала (Y-m-d), переопределяет «свежие данные»}
-                            {--date-to= : Дата окончания (Y-m-d)}';
+                            {--date-to= : Дата окончания (Y-m-d)}
+                            {--queue : Поставить импорт в очередь}';
 
     protected $description = 'Импорт incomes, orders, sales, stocks для одного или всех аккаунтов';
 
-    public function handle(): int
+    public function handle(ImportRunner $runner): int
     {
-        $accounts = $this->resolveAccounts();
-
-        foreach ($accounts as $account) {
-            $this->info("=== Аккаунт: {$account->name} (id={$account->id}) ===");
-
-            $options = array_filter([
-                '--account' => (string) $account->id,
-                '--date-from' => $this->option('date-from'),
-                '--date-to' => $this->option('date-to'),
-            ], fn ($v) => $v !== null && $v !== '');
-
-            if ($this->output->isVerbose()) {
-                $options['-v'] = true;
+        if ($this->option('queue')) {
+            if ($this->option('all-accounts') && ! $this->option('account')) {
+                return $this->dispatchImportAllJob();
             }
 
-            foreach (['app:import-incomes', 'app:import-orders', 'app:import-sales', 'app:import-stocks'] as $command) {
-                $exitCode = Artisan::call($command, $options, $this->output);
+            return $this->dispatchQueuedEntities(self::ENTITIES);
+        }
 
-                if ($exitCode !== self::SUCCESS) {
-                    $this->error("Команда {$command} завершилась с ошибкой для аккаунта {$account->name}.");
+        foreach ($this->resolveAccounts() as $account) {
+            $this->info("=== Аккаунт: {$account->name} (id={$account->id}) ===");
+
+            foreach (self::ENTITIES as $entity) {
+                try {
+                    $count = $runner->runEntity(
+                        entity: $entity,
+                        account: $account,
+                        dateFrom: $this->option('date-from'),
+                        dateTo: $this->option('date-to'),
+                        verbose: $this->output->isVerbose(),
+                        debugLogger: $this->debugLogger(),
+                    );
+
+                    $this->info("  {$entity}: {$count} записей.");
+                } catch (\Throwable $e) {
+                    $this->error("  {$entity} завершился с ошибкой: {$e->getMessage()}");
 
                     return self::FAILURE;
                 }

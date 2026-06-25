@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libonig-dev \
     libxml2-dev \
     curl \
-    cron \
+    supervisor \
     && docker-php-ext-install \
         pdo_mysql \
         mbstring \
@@ -22,7 +22,8 @@ WORKDIR /var/www/html
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY docker/php.ini /usr/local/etc/php/conf.d/99-memory.ini
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY docker/supervisord.conf /var/www/html/docker/supervisord.conf
+RUN chmod +x /usr/local/bin/entrypoint.sh \
+    && mkdir -p /etc/supervisor/conf.d /var/log/supervisor
 
 ENTRYPOINT ["entrypoint.sh"]
-CMD ["php", "artisan", "list"]

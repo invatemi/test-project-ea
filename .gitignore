@@ -24,3 +24,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Node / микросервисы (если рядом с Laravel)
+node_modules/
+services/**/.env
+dist/

@@ -9,78 +9,64 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('companies')) {
-            Schema::create('companies', function (Blueprint $table) {
-                $table->id();
-                $table->string('name')->unique();
-                $table->timestamps();
-            });
-        }
+        Schema::create('companies', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique();
+            $table->timestamps();
+        });
 
-        if (! Schema::hasTable('api_services')) {
-            Schema::create('api_services', function (Blueprint $table) {
-                $table->id();
-                $table->string('slug', 64)->unique();
-                $table->string('name');
-                $table->string('base_url', 512);
-                $table->timestamps();
-            });
-        }
+        Schema::create('api_services', function (Blueprint $table) {
+            $table->id();
+            $table->string('slug', 64)->unique();
+            $table->string('name');
+            $table->string('base_url', 512);
+            $table->timestamps();
+        });
 
-        if (! Schema::hasTable('token_types')) {
-            Schema::create('token_types', function (Blueprint $table) {
-                $table->id();
-                $table->string('slug', 64)->unique();
-                $table->string('name');
-                $table->timestamps();
-            });
-        }
+        Schema::create('token_types', function (Blueprint $table) {
+            $table->id();
+            $table->string('slug', 64)->unique();
+            $table->string('name');
+            $table->timestamps();
+        });
 
-        if (! Schema::hasTable('api_service_token_types')) {
-            Schema::create('api_service_token_types', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('api_service_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('token_type_id')->constrained()->cascadeOnDelete();
-                $table->timestamps();
-                $table->unique(['api_service_id', 'token_type_id']);
-            });
-        }
+        Schema::create('api_service_token_types', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('api_service_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('token_type_id')->constrained()->cascadeOnDelete();
+            $table->timestamps();
+            $table->unique(['api_service_id', 'token_type_id']);
+        });
 
-        if (! Schema::hasTable('accounts')) {
-            Schema::create('accounts', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('company_id')->constrained()->cascadeOnDelete();
-                $table->string('name');
-                $table->boolean('is_active')->default(true);
-                $table->timestamps();
-                $table->unique(['company_id', 'name']);
-            });
-        }
+        Schema::create('accounts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained()->cascadeOnDelete();
+            $table->string('name');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+            $table->unique(['company_id', 'name']);
+        });
 
-        if (! Schema::hasTable('account_tokens')) {
-            Schema::create('account_tokens', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('account_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('api_service_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('token_type_id')->constrained()->cascadeOnDelete();
-                $table->text('credentials');
-                $table->boolean('is_active')->default(true);
-                $table->timestamps();
-                $table->unique(['account_id', 'api_service_id', 'token_type_id'], 'uq_account_token');
-            });
-        }
+        Schema::create('account_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('account_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('api_service_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('token_type_id')->constrained()->cascadeOnDelete();
+            $table->text('credentials');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+            $table->unique(['account_id', 'api_service_id', 'token_type_id'], 'uq_account_token');
+        });
 
-        if (! Schema::hasTable('account_sync_states')) {
-            Schema::create('account_sync_states', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('account_id')->constrained()->cascadeOnDelete();
-                $table->string('entity', 32);
-                $table->timestamp('last_synced_at')->nullable();
-                $table->date('last_date_from')->nullable();
-                $table->timestamps();
-                $table->unique(['account_id', 'entity']);
-            });
-        }
+        Schema::create('account_sync_states', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('account_id')->constrained()->cascadeOnDelete();
+            $table->string('entity', 32);
+            $table->timestamp('last_synced_at')->nullable();
+            $table->date('last_date_from')->nullable();
+            $table->timestamps();
+            $table->unique(['account_id', 'entity']);
+        });
 
         if (DB::table('api_services')->where('slug', 'wb_test')->doesntExist()) {
             DB::table('api_services')->insert([

@@ -139,9 +139,9 @@ class WbDataImporter
     }
 
     /**
-     * @param  callable(array<int, array<string, mixed>>): int  $processPage
+     * @param  callable(array<int, array<string, mixed>>): int  $processRows
      */
-    private function paginate(string $endpoint, string $dateFrom, ?string $dateTo, callable $processPage): int
+    private function paginate(string $endpoint, string $dateFrom, ?string $dateTo, callable $processRows): int
     {
         if ($this->client === null) {
             throw new \RuntimeException('Importer not configured. Call forAccount() first.');
@@ -149,9 +149,19 @@ class WbDataImporter
 
         DB::connection()->disableQueryLog();
 
+        $allRows = $this->fetchAllPages($endpoint, $dateFrom, $dateTo);
+
+        return DB::transaction(fn (): int => $processRows($allRows));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchAllPages(string $endpoint, string $dateFrom, ?string $dateTo): array
+    {
         $page = 1;
-        $imported = 0;
         $lastPage = null;
+        $allRows = [];
 
         while (true) {
             $response = $this->client->fetch($endpoint, $dateFrom, $dateTo, $page);
@@ -169,10 +179,10 @@ class WbDataImporter
                 break;
             }
 
-            $imported += $processPage($rows);
+            array_push($allRows, ...$rows);
 
             if ($this->verbose) {
-                $this->logDebug("Страница {$page}/{$lastPage}: +".count($rows)." строк, всего {$imported}");
+                $this->logDebug("Страница {$page}/{$lastPage}: +".count($rows).' строк');
             }
 
             if ($lastPage > 0 && $page >= $lastPage) {
@@ -182,7 +192,11 @@ class WbDataImporter
             $page++;
         }
 
-        return $imported;
+        if ($this->verbose) {
+            $this->logDebug("Всего получено: ".count($allRows).' строк');
+        }
+
+        return $allRows;
     }
 
     /**

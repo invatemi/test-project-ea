@@ -127,13 +127,19 @@ docker compose exec php php artisan app:import-orders --account=1 --date-from=20
 docker compose exec php php artisan app:import-orders --account=1 -v
 ```
 
-Без `--date-from` импорт берёт **свежие данные** — с даты последней синхронизации аккаунта (минус 1 день буфера).
+### Импорт через очередь
+```bash
+docker compose exec php php artisan app:import-all --all-accounts --queue
+docker compose exec php php artisan queue:work --once
+```
+
+Для постоянной обработки очереди установите `RUN_QUEUE_WORKER=true` в `.env` и перезапустите контейнер.
 
 ---
 
 ## Автоматический импорт (2 раза в день)
 
-В PHP-контейнере работает cron, который каждую минуту вызывает Laravel Scheduler.
+В PHP-контейнере **supervisor** запускает `php artisan schedule:work`. Планировщик ставит job `ImportAllAccountsJob`, который диспатчит импорт по каждому аккаунту и сущности в очередь.
 
 Расписание по умолчанию: **08:00** и **20:00** (timezone `APP_TIMEZONE`).
 
@@ -141,9 +147,17 @@ docker compose exec php php artisan app:import-orders --account=1 -v
 ```
 IMPORT_SCHEDULE_TIMES=8,20
 APP_TIMEZONE=Europe/Moscow
+QUEUE_CONNECTION=database
+RUN_QUEUE_WORKER=true
 ```
 
-Логи планировщика: `storage/logs/scheduler.log`
+Логи планировщика: `storage/logs/scheduler.log`  
+Логи supervisor: `storage/logs/supervisor-*.log`
+
+Проверка здоровья контейнера:
+```bash
+docker compose exec php php artisan app:health
+```
 
 ---
 
@@ -181,12 +195,12 @@ docker compose down
 docker compose down -v   # удалить данные БД
 ```
 
-Миграции (для существующей БД без пересоздания volume; при старте контейнера выполняются автоматически):
+Миграции (при старте контейнера выполняются автоматически):
 ```bash
 docker compose exec php php artisan migrate
 ```
 
-Схема импорта (`incomes`, `orders`, `sales`, `stocks`) создаётся через миграции Laravel и дублируется в `db.sql` для первичной инициализации MySQL volume.
+Схема БД создаётся **только через миграции Laravel**. Для чистой переинициализации: `docker compose down -v && docker compose up --build`.
 
 ---
 

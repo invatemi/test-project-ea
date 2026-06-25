@@ -3,8 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\RunsAccountImport;
-use App\Models\Sale;
-use App\Services\WbDataImporter;
+use App\Services\ImportRunner;
 use Illuminate\Console\Command;
 
 class ImportSales extends Command
@@ -15,33 +14,33 @@ class ImportSales extends Command
                             {--account= : ID или имя аккаунта}
                             {--all-accounts : Импорт для всех активных аккаунтов}
                             {--date-from= : Дата начала (Y-m-d)}
-                            {--date-to= : Дата окончания (Y-m-d)}';
+                            {--date-to= : Дата окончания (Y-m-d)}
+                            {--queue : Поставить импорт в очередь}';
 
     protected $description = 'Импорт продаж (sales) из WB API';
 
-    public function handle(WbDataImporter $importer): int
+    public function handle(ImportRunner $runner): int
     {
-        $importer = $this->configureImporter();
+        if ($this->option('queue')) {
+            return $this->dispatchQueuedEntities(['sales']);
+        }
+
         $total = 0;
 
         foreach ($this->resolveAccounts() as $account) {
-            $range = $this->resolveFreshRange('sales', $account);
-            $dateFrom = $range['date_from'];
-            $dateTo = $range['date_to'];
+            $range = $runner->resolveRange('sales', $account, $this->option('date-from'), $this->option('date-to'));
+            $this->logFreshRange('sales', $account);
+            $this->info("Импорт sales [{$account->name}]: {$range['date_from']} — {$range['date_to']}");
 
-            $this->info("Импорт sales [{$account->name}]: {$dateFrom} — {$dateTo}");
-
-            $count = $this->importerForAccount($importer, $account)->import(
-                endpoint: 'sales',
-                model: new Sale,
-                fillable: (new Sale)->getFillable(),
-                dateFrom: $dateFrom,
-                dateTo: $dateTo,
-                uniqueBy: ['sale_id'],
-                rowTransformer: fn (array $record) => empty($record['sale_id']) ? [] : $record,
+            $count = $runner->runEntity(
+                entity: 'sales',
+                account: $account,
+                dateFrom: $this->option('date-from'),
+                dateTo: $this->option('date-to'),
+                verbose: $this->output->isVerbose(),
+                debugLogger: $this->debugLogger(),
             );
 
-            $this->importerForAccount($importer, $account)->markSynced('sales', $dateFrom);
             $this->info("Готово [{$account->name}]: {$count} записей.");
             $total += $count;
         }

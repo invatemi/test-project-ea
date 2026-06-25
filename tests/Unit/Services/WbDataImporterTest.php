@@ -215,4 +215,45 @@ class WbDataImporterTest extends TestCase
                 uniqueBy: ['income_id', 'supplier_article', 'barcode', 'tech_size'],
             );
     }
+
+    public function test_import_rolls_back_when_later_page_fails(): void
+    {
+        $ctx = $this->seedAccountWithToken(1);
+
+        Http::fake([
+            'test-api.local/api/incomes*' => Http::sequence()
+                ->push([
+                    'data' => [[
+                        'incomeId' => 1,
+                        'supplierArticle' => 'ART-1',
+                        'barcode' => '111',
+                        'techSize' => 'M',
+                        'date' => '2024-01-01',
+                        'warehouseName' => 'WH',
+                        'quantity' => 1,
+                        'totalPrice' => 10,
+                    ]],
+                    'meta' => ['last_page' => 2],
+                ], 200)
+                ->push(['error' => 'fail'], 500),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('HTTP 500');
+
+        try {
+            app(WbDataImporter::class)
+                ->forAccount($ctx['account'], $ctx['token'])
+                ->import(
+                    endpoint: 'incomes',
+                    model: new Income,
+                    fillable: (new Income)->getFillable(),
+                    dateFrom: '2024-01-01',
+                    dateTo: '2024-12-31',
+                    uniqueBy: ['income_id', 'supplier_article', 'barcode', 'tech_size'],
+                );
+        } finally {
+            $this->assertSame(0, Income::query()->where('account_id', $ctx['account']->id)->count());
+        }
+    }
 }
