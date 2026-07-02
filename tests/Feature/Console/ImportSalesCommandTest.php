@@ -44,6 +44,28 @@ class ImportSalesCommandTest extends TestCase
         $this->assertSame('S1', Sale::query()->value('sale_id'));
     }
 
+    public function test_imports_sales_with_null_is_storno(): void
+    {
+        $ctx = $this->seedAccountWithToken(1);
+
+        Http::fake([
+            'test-api.local/api/sales*' => Http::response([
+                'data' => [
+                    ['saleId' => 'S1', 'date' => '2024-01-01', 'isStorno' => null],
+                ],
+                'meta' => ['last_page' => 1],
+            ], 200),
+        ]);
+
+        $this->artisan('app:import-sales', [
+            '--account' => (string) $ctx['account']->id,
+            '--date-from' => '2024-01-01',
+            '--date-to' => '2024-12-31',
+        ])->assertSuccessful();
+
+        $this->assertFalse(Sale::query()->where('sale_id', 'S1')->value('is_storno'));
+    }
+
     public function test_fails_when_account_has_no_token(): void
     {
         config(['wb_api.key' => null]);

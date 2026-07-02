@@ -14,6 +14,8 @@ use Illuminate\Support\Str;
 
 class WbDataImporter
 {
+    private const UPSERT_CHUNK_SIZE = 200;
+
     private ?ApiClientInterface $client = null;
 
     private int $accountId = 0;
@@ -71,20 +73,26 @@ class WbDataImporter
         $uniqueBy = $this->prependAccountId($uniqueBy);
 
         return $this->paginate($endpoint, $dateFrom, $dateTo, function (array $rows) use ($model, $fillable, $uniqueBy, $rowTransformer): int {
-            $payload = $this->buildPayload($rows, $fillable, $rowTransformer);
+            $imported = 0;
 
-            if ($payload === []) {
-                return 0;
+            foreach (array_chunk($rows, self::UPSERT_CHUNK_SIZE) as $chunk) {
+                $payload = $this->buildPayload($chunk, $fillable, $rowTransformer);
+
+                if ($payload === []) {
+                    continue;
+                }
+
+                if ($uniqueBy !== null) {
+                    $updateColumns = array_values(array_diff(array_keys($payload[0]), $uniqueBy));
+                    $model->newQuery()->upsert($payload, $uniqueBy, $updateColumns);
+                } else {
+                    $model->newQuery()->insert($payload);
+                }
+
+                $imported += count($payload);
             }
 
-            if ($uniqueBy !== null) {
-                $updateColumns = array_values(array_diff(array_keys($payload[0]), $uniqueBy));
-                $model->newQuery()->upsert($payload, $uniqueBy, $updateColumns);
-            } else {
-                $model->newQuery()->insert($payload);
-            }
-
-            return count($payload);
+            return $imported;
         });
     }
 
@@ -120,8 +128,10 @@ class WbDataImporter
             $imported += $this->upsertBatch(new Order, $byOdid, ['account_id', 'odid']);
 
             if ($withoutKey !== []) {
-                Order::query()->insert($withoutKey);
-                $imported += count($withoutKey);
+                foreach (array_chunk($withoutKey, self::UPSERT_CHUNK_SIZE) as $chunk) {
+                    Order::query()->insert($chunk);
+                    $imported += count($chunk);
+                }
             }
 
             return $imported;
@@ -272,10 +282,15 @@ class WbDataImporter
             return 0;
         }
 
-        $updateColumns = array_values(array_diff(array_keys($rows[0]), $uniqueBy));
-        $model->newQuery()->upsert($rows, $uniqueBy, $updateColumns);
+        $imported = 0;
 
-        return count($rows);
+        foreach (array_chunk($rows, self::UPSERT_CHUNK_SIZE) as $chunk) {
+            $updateColumns = array_values(array_diff(array_keys($chunk[0]), $uniqueBy));
+            $model->newQuery()->upsert($chunk, $uniqueBy, $updateColumns);
+            $imported += count($chunk);
+        }
+
+        return $imported;
     }
 
     /** @param  array<int, string>|null  $uniqueBy */

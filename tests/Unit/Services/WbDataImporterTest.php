@@ -166,6 +166,44 @@ class WbDataImporterTest extends TestCase
         $this->assertSame(1, $count);
     }
 
+    public function test_import_sales_defaults_null_is_storno_to_false(): void
+    {
+        $ctx = $this->seedAccountWithToken(1);
+
+        Http::fake([
+            'test-api.local/api/sales*' => Http::response([
+                'data' => [
+                    ['saleId' => 'S1', 'date' => '2024-01-01', 'isStorno' => null],
+                ],
+                'meta' => ['last_page' => 1],
+            ], 200),
+        ]);
+
+        app(WbDataImporter::class)
+            ->forAccount($ctx['account'], $ctx['token'])
+            ->import(
+                endpoint: 'sales',
+                model: new Sale,
+                fillable: (new Sale)->getFillable(),
+                dateFrom: '2024-01-01',
+                dateTo: '2024-12-31',
+                uniqueBy: ['sale_id'],
+                rowTransformer: function (array $record): array {
+                    if (empty($record['sale_id'])) {
+                        return [];
+                    }
+
+                    if (! array_key_exists('is_storno', $record) || $record['is_storno'] === null) {
+                        $record['is_storno'] = false;
+                    }
+
+                    return $record;
+                },
+            );
+
+        $this->assertFalse(Sale::query()->where('sale_id', 'S1')->value('is_storno'));
+    }
+
     public function test_mark_synced_persists_account_sync_state(): void
     {
         $ctx = $this->seedAccountWithToken(1);

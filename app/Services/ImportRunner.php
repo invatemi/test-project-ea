@@ -112,7 +112,17 @@ class ImportRunner
             dateFrom: $range['date_from'],
             dateTo: $range['date_to'],
             uniqueBy: ['sale_id'],
-            rowTransformer: fn (array $record) => empty($record['sale_id']) ? [] : $record,
+            rowTransformer: function (array $record): array {
+                if (empty($record['sale_id'])) {
+                    return [];
+                }
+
+                if (! array_key_exists('is_storno', $record) || $record['is_storno'] === null) {
+                    $record['is_storno'] = false;
+                }
+
+                return $record;
+            },
         );
         $importer->markSynced('sales', $range['date_from']);
 
@@ -134,6 +144,12 @@ class ImportRunner
             uniqueBy: ['date', 'nm_id', 'warehouse_name', 'barcode', 'tech_size'],
             rowTransformer: function (array $record) use ($date) {
                 $record['date'] = $date;
+
+                foreach (['in_way_to_client', 'in_way_from_client', 'quantity'] as $field) {
+                    if (! array_key_exists($field, $record) || $record[$field] === null) {
+                        $record[$field] = 0;
+                    }
+                }
 
                 return (! isset($record['nm_id']) || $record['nm_id'] === '' || empty($record['warehouse_name']))
                     ? []
